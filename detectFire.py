@@ -79,24 +79,25 @@ def kcy(x,y,w,h):
    
     return kc
 
-def YoloDetect(image, result, x1, y1, w1, h1):
+def YoloDetect(result):
     for info in result:
         boxes = info.boxes
         for box in boxes:
             confidence = box.conf[0]
             confidence = math.ceil(confidence * 100)
-            if confidence > 50:
-                x1,y1,w1,h1 = box.xyxy[0]
-                x1, y1, w1, h1 = int(x1),int(y1),int(w1),int(h1)
-                w1 = w1 - x1
-                h1 = h1 - y1 
+            if confidence > 70:
+                print("FIRE")
+                return 1
+               
+        print("NO FIRE")
+        return 0
 
-    return x1,y1,w1,h1
+    #return x1,y1,w1,h1
 def main():
     # Running real time from webcam
-    cap = cv2.VideoCapture(0)
-    model = YOLO('nckh/nckhDetects/best.pt')
-    fire_cascade = cv2.CascadeClassifier("nckh/nckhDetects/fire_detection.xml")
+    cap = cv2.VideoCapture(1)
+    model = YOLO('nckhUptoGit/nckhDetects/fire.pt')
+    fire_cascade = cv2.CascadeClassifier("nckhUptoGit/nckhDetects/fire_detection.xml")
     # Reading the classes
     
     check_fire = False
@@ -120,20 +121,40 @@ def main():
         
         x,y,w,h = 0,0,0,0
         fire = fire_cascade.detectMultiScale(image, 1.1, 2)
-        if(check_fire != True):
-            for x, y, w, h in fire:
-                cv2.rectangle(image, (x, y), (x + w, y + h), (255, 0, 0), 2)
-            if w != 0:
-                drawKc(image, x, y, w, h)
-                check_fire = True  
+       
+        for x, y, w, h in fire:
+            print("ok")
+            cv2.rectangle(image, (x - 10, y - 10), (x - 10 + (w+10), y - 10 + (h+10)), (255, 0, 0), 2)
+        
+        if( w != 0):    
+            x1 = x + w
+            y1 = y + h 
+            image_cut = image[y - 20:y1 + 20 , x - 10:x1 + 20] # v
+            
+            cv2.imshow("he", image_cut)
+            result = model(image_cut,stream=True)
+            if YoloDetect(result) == 1:
+                PackageGocPx, PackageGocPy, PackageDirection = handlerAndSendToSignal(image, x,y,h,w)
+                str = PackageGocPx + "\n" + PackageGocPy + "," + PackageDirection + "."  
+                print(str)
+                
+                
+            # if w != 0:
+            #     drawKc(image, x, y, w, h)
+            #     check_fire = True  
               
-        x1,y1,w1,h1 = 0,0,0,0
-        if(check_fire == True): 
-            result = model(image,stream=True)
-            x1,y1,w1,h1 = YoloDetect(image, result, x1,y1,h1,w1)
-            PackageGocPx, PackageGocPy, PackageDirection = handlerAndSendToSignal(image, x1,y1,h1,w1)
-            str = PackageGocPx + "\n" + PackageGocPy + "," + PackageDirection + "."  
-            print(str)
+        # x1,y1,w1,h1 = 0,0,0,0
+        # if(check_fire == True): 
+        #     for x, y, w, h in fire:
+        #         cv2.rectangle(image, (x, y), (x + w, y + h), (255, 0, 0), 2)
+        #         
+        #     cv2.imshow("1", image_cut)
+        #     result = model(image_cut,stream=True)
+        #     YoloDetect(result)
+            # if YoloDetect(result) == 1:
+            #     PackageGocPx, PackageGocPy, PackageDirection = handlerAndSendToSignal(image, x,y,h,w)
+            #     str = PackageGocPx + "\n" + PackageGocPy + "," + PackageDirection + "."  
+            #     print(str)
         
             
          
