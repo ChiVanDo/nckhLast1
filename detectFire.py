@@ -2,16 +2,55 @@ from ultralytics import YOLO
 import cvzone
 import cv2
 import math
+import time
 
-def drawxy(img,x,y,w,h):
+def drawKC(img, x, y, w, h):
+    cv2.line(img, (320, y + int(h / 2)), (x + int(w / 2), y + int(h / 2)), (0, 255, 0), 2)  # line từ Y ra tâm ngọn lửa
+    cv2.line(img, (x + int(w / 2), 240), (x + int(w / 2), y + int(h / 2)), (0, 255, 0), 2)  # line từ X ra tâm ngọn lửa
+def drawKc(img, x,y,w,h):
+    cv2.line(img, (320,y+int(h/2)), (x+int(w/2), y+int(h/2)), (0,255,0), 2) # 
+    cv2.line(img, (x+int(w/2), 240), (x+int(w/2), y+int(h/2)), (0,255,0), 2) # 
+def handlerAndSendToSignal(image, x,y,w,h):
+    goc_quay_Px, goc_quay_Py = 0, 0
+    direction = "null"
+    if x != 0 and y != 0:
+        Px = kcx(x, y, w, h)
+        Py = kcy(x, y, w, h)
+        if(Py > 12 or Px > 12):
+            print("PixelX", Px)
+            print("PixelY", Py)
+            if x > 320 and y > 240:  # Phải/Dưới
+                direction = "00"
+            elif x > 320 and y < 240:  # Phải/Trên
+                direction = "01"
+            elif x < 320 and y > 240:  # Trái/Dưới
+                direction = "10"
+            elif x < 320 and y < 240:  # Trái/Trên
+                direction = "11"
+            
+            goc_quay_Px = int((Px / 3.2) * 10)
+            goc_quay_Py = int((Py / 4.3) * 10)
+                
+            # if(x > 320 or y > 240):
+            #     goc_quay_Px = int((Px / 3.2) * 10)
+            #     goc_quay_Py = int((Py / 3.2) * 10)
+            # elif x < 320 or y < 240:
+            #     goc_quay_Px = int((Px / 3.2) * 10)
+            #     goc_quay_Py = int((Py / 3.2) * 10)
+        elif Px < 12 and Py < 12:
+            direction = "OK"
+    drawKc(image, x, y, w, h)
+    cv2.rectangle(image, (x, y), (x + w, y + h), (255, 0, 255), 2)  # ve hinh chu nhat quanh contours
+    print(goc_quay_Px,":", goc_quay_Py ,":", direction)
+    return str(goc_quay_Px), str(goc_quay_Py), direction
+
+def drawxy(img):
     cv2.line(img, (320,0), (320, 480), (0,255,255), 2) # dọc  y
     cv2.line(img, (0,240), (640, 240), (0,255,255), 2) # ngang x
     
     cv2.putText(img, "x" , (620 , 230), cv2.FONT_HERSHEY_SIMPLEX,1,(255,0,0), 2, cv2.LINE_AA)
     cv2.putText(img, "y" , (330 , 20), cv2.FONT_HERSHEY_SIMPLEX,1,(255,0,0), 2, cv2.LINE_AA)
-def drawKc(img, x,y,w,h):
-    cv2.line(img, (320,y+int(h/2)), (x+int(w/2), y+int(h/2)), (0,255,0), 2) # 
-    cv2.line(img, (x+int(w/2), 240), (x+int(w/2), y+int(h/2)), (0,255,0), 2) # 
+
 def kcx(x,y,w,h):
     # Tọa độ của điểm 1
     #x1, y1 = 0, 240
@@ -39,70 +78,65 @@ def kcy(x,y,w,h):
     kc = math.sqrt(((x+int(w/2)) - (x+int(w/2)))**2 + ((y+int(h/2)) - 240)**2)
    
     return kc
+
+def YoloDetect(image, result, x1, y1, w1, h1):
+    for info in result:
+        boxes = info.boxes
+        for box in boxes:
+            confidence = box.conf[0]
+            confidence = math.ceil(confidence * 100)
+            if confidence > 50:
+                x1,y1,w1,h1 = box.xyxy[0]
+                x1, y1, w1, h1 = int(x1),int(y1),int(w1),int(h1)
+                w1 = w1 - x1
+                h1 = h1 - y1 
+
+    return x1,y1,w1,h1
 def main():
     # Running real time from webcam
-    cap = cv2.VideoCapture(1)
+    cap = cv2.VideoCapture(0)
     model = YOLO('nckh/nckhDetects/best.pt')
     fire_cascade = cv2.CascadeClassifier("nckh/nckhDetects/fire_detection.xml")
     # Reading the classes
-    classnames = ['fire']
     
-    x1,y1,w1,h1 = 0,0,0,0
     check_fire = False
-    x,y,w,h = 0,0,0,0
-   
+    
+    #last_send_time = time.time()
     while True:
         ret,image = cap.read()
-        drawxy(image, x, y, w, h)
+        drawxy(image)
         #image = cv2.resize(image,(640,480))
+        # current_time = time.time()
+        # if current_time - last_send_time >= 1.5:  # 0.5 giây = 500ms
+            
+        #     PackageGocPx, PackageGocPy, PackageDirection = redcolor(image)
+        #     str = PackageGocPx + "\n" + PackageGocPy + "," + PackageDirection + "."
+            
+        #     if(PackageDirection != "null" or PackageDirection != "OK"):
+        #         print("hi")
+        #         ser.write(str.encode())
+            
+        #     last_send_time = current_time  
         
-        result = model(image,stream=True)
-        fire = fire_cascade.detectMultiScale(image, 1.15, 1)
-        
-        s = 0
-        for x, y, w, h in fire:
-            cv2.rectangle(image, (x, y), (x + w, y + h), (255, 0, 0), 2)
-            s = kcx(x, y, w, h)
-            # print("kc x:", kcx(x, y, w, h))
-            # print("kc y:", kcy(x, y, w, h))
-           
-        if s != 0:
-            drawKc(image, x, y, w, h)
-            check_fire = True    
-             
+        x,y,w,h = 0,0,0,0
+        fire = fire_cascade.detectMultiScale(image, 1.1, 2)
+        if(check_fire != True):
+            for x, y, w, h in fire:
+                cv2.rectangle(image, (x, y), (x + w, y + h), (255, 0, 0), 2)
+            if w != 0:
+                drawKc(image, x, y, w, h)
+                check_fire = True  
+              
+        x1,y1,w1,h1 = 0,0,0,0
         if(check_fire == True): 
-            # Getting bbox,confidence and class names informations to work with
-            for info in result:
-                boxes = info.boxes
+            result = model(image,stream=True)
+            x1,y1,w1,h1 = YoloDetect(image, result, x1,y1,h1,w1)
+            PackageGocPx, PackageGocPy, PackageDirection = handlerAndSendToSignal(image, x1,y1,h1,w1)
+            str = PackageGocPx + "\n" + PackageGocPy + "," + PackageDirection + "."  
+            print(str)
         
-                for box in boxes:
-                    confidence = box.conf[0]
-                    confidence = math.ceil(confidence * 100)
-                    Class = int(box.cls[0])
-                    print("condi:", confidence)
-                    if confidence > 50:
-                        x1,y1,w1,h1 = box.xyxy[0]
-                        
-                        x1, y1, w1, h1 = int(x1),int(y1),int(w1),int(h1)
-                        cv2.rectangle(image,(x1,y1),(w1,h1),(0,0,255),5)
-                        w1 = w1 - x1
-                        h1 = h1 - y1
- 
-                        print('tdxywh:',x1,y1,w1,h1)
-                        print(kcx(x1,y1,w1,h1)) 
-                        cvzone.putTextRect(image, f'{classnames[Class]} {confidence}%', [x1 + 8, y1 + 100],scale=1.5,thickness=2) 
-                            
-                       
-                    else:
-                        check_fire = False
-      
-        if(w1 != 0 | h1 != 0):
-            drawKc(image,x1,y1,w1,h1)   
-            print('kc x:',kcx(x1,y1,w1,h1))
-            print('kc y:',kcy(x1,y1,w1,h1))        
             
-            
-                    
+         
         cv2.imshow('image',image)
         k = cv2.waitKey(1)
         if k%256 == 27:
